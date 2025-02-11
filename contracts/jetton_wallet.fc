@@ -5,18 +5,25 @@
 const int min_tons_for_storage = 10000000; ;; 0.01 TON
 const int gas_consumption = 15000000; ;; 0.015 TON
 
-(int, slice, slice, cell) load_data() inline_ref {
+global int balance;
+global slice owner;
+global slice jetton_minter;
+global int deposit_ts;
+global int apy;
+global cell jetton_wallet_code;
+
+() load_data() impure inline_ref {
     slice ds = get_data().begin_parse();
-    return (
-        ds~load_coins(),
-        ds~load_msg_addr(),
-        ds~load_msg_addr(),
-        ds~load_ref()
-    );
+    balance = ds~load_coins();
+    owner = ds~load_msg_addr();
+    jetton_minter = ds~load_msg_addr();
+    deposit_ts = ds~load_uint(32);
+    apy = ds~load_uint(4);
+    jetton_wallet_code = ds~load_ref();
 }
 
-() save_data(int balance, slice owner_address, slice jetton_master_address, cell jetton_wallet_code) impure inline_ref {
-    set_data(pack_jetton_wallet_data(balance, owner_address, jetton_master_address, jetton_wallet_code));
+() save_data() impure inline_ref {
+    set_data(pack_jetton_wallet_data(balance, owner, jetton_minter, jetton_wallet_code));
 }
 
 () send_tokens(slice in_msg_body, slice sender_address, int msg_value, int fwd_fee) impure {
@@ -25,13 +32,13 @@ const int gas_consumption = 15000000; ;; 0.015 TON
     slice to_owner_address = in_msg_body~load_msg_addr();
     force_chain(to_owner_address);
     
-    (int balance, slice owner_address, slice jetton_master_address, cell jetton_wallet_code) = load_data();
+    load_data();
     balance -= jetton_amount;
 
-    throw_unless(705, equal_slices_bits(owner_address, sender_address));
+    throw_unless(705, equal_slices_bits(owner, sender_address));
     throw_unless(706, balance >= 0);
 
-    cell state_init = calculate_jetton_wallet_state_init(to_owner_address, jetton_master_address, jetton_wallet_code);
+    cell state_init = calculate_jetton_wallet_state_init(to_owner_address, jetton_minter, jetton_wallet_code);
     slice to_wallet_address = calculate_jetton_wallet_address(state_init);
     slice response_address = in_msg_body~load_msg_addr();
     cell custom_payload = in_msg_body~load_dict();
@@ -50,7 +57,7 @@ const int gas_consumption = 15000000; ;; 0.015 TON
         .store_uint(op::internal_transfer, 32)
         .store_uint(query_id, 64)
         .store_coins(jetton_amount)
-        .store_slice(owner_address)
+        .store_slice(owner)
         .store_slice(response_address)
         .store_coins(forward_ton_amount)
         .store_slice(either_forward_payload)
@@ -62,11 +69,11 @@ const int gas_consumption = 15000000; ;; 0.015 TON
 
     send_raw_message(msg.end_cell(), SEND_MODE_CARRY_ALL_REMAINING_MESSAGE_VALUE);
 
-    save_data(balance, owner_address, jetton_master_address, jetton_wallet_code);
+    save_data();
 }
 
 () receive_tokens(slice in_msg_body, slice sender_address, int my_ton_balance, int fwd_fee, int msg_value) impure {
-    (int balance, slice owner_address, slice jetton_master_address, cell jetton_wallet_code) = load_data();
+    load_data();
 
     int query_id = in_msg_body~load_uint(64);
     int jetton_amount = in_msg_body~load_coins();
@@ -75,9 +82,16 @@ const int gas_consumption = 15000000; ;; 0.015 TON
 
     slice from_address = in_msg_body~load_msg_addr();
     slice response_address = in_msg_body~load_msg_addr();
-    throw_unless(707, equal_slices_bits(jetton_master_address, sender_address) | equal_slices_bits(calculate_user_jetton_wallet_address(from_address, jetton_master_address, jetton_wallet_code), sender_address));
+    throw_unless(707, equal_slices_bits(jetton_minter, sender_address) | equal_slices_bits(calculate_user_jetton_wallet_address(from_address, jetton_minter, jetton_wallet_code), sender_address));
     
     int forward_ton_amount = in_msg_body~load_coins();
+
+    if (sender_address == jetton_minter) {
+        int new_apy = in_msg_body~load_uint(4);
+        apy = new_apy;
+
+        deposit_ts = now();
+    }
 
     int ton_balance_before_msg = my_ton_balance - msg_value;
     int storage_fee = min_tons_for_storage - min(ton_balance_before_msg, min_tons_for_storage);
@@ -96,7 +110,7 @@ const int gas_consumption = 15000000; ;; 0.015 TON
             .end_cell();
         cell msg = begin_cell()
             .store_uint(0x10, 6) 
-            .store_slice(owner_address)
+            .store_slice(owner)
             .store_coins(forward_ton_amount)
             .store_uint(1, 1 + 4 + 4 + 64 + 32 + 1 + 1)
             .store_ref(msg_body)
@@ -116,11 +130,11 @@ const int gas_consumption = 15000000; ;; 0.015 TON
         send_raw_message(msg, SEND_MODE_IGNORE_ERRORS);
     }
 
-    save_data(balance, owner_address, jetton_master_address, jetton_wallet_code);
+    save_data();
 }
 
 () burn_tokens(slice in_msg_body, slice sender_address, int msg_value, int fwd_fee) impure {
-    (int balance, slice owner_address, slice jetton_master_address, cell jetton_wallet_code) = load_data();
+    load_data();
 
     int query_id = in_msg_body~load_uint(64);
     int jetton_amount = in_msg_body~load_coins();
@@ -128,7 +142,7 @@ const int gas_consumption = 15000000; ;; 0.015 TON
 
     balance -= jetton_amount;
 
-    throw_unless(705, equal_slices_bits(owner_address, sender_address));
+    throw_unless(705, equal_slices_bits(owner, sender_address));
     throw_unless(706, balance >= 0);
     throw_unless(707, msg_value > fwd_fee + 2 * gas_consumption);
 
@@ -136,25 +150,25 @@ const int gas_consumption = 15000000; ;; 0.015 TON
         .store_uint(op::burn_notification, 32)
         .store_uint(query_id, 64)
         .store_coins(jetton_amount)
-        .store_slice(owner_address)
+        .store_slice(owner)
         .store_slice(response_address)
         .end_cell();
     cell msg = begin_cell()
         .store_uint(0x18, 6)
-        .store_slice(jetton_master_address)
+        .store_slice(jetton_minter)
         .store_coins(0)
         .store_uint(1, 1 + 4 + 4 + 64 + 32 + 1 + 1)
         .store_ref(msg_body)
         .end_cell();
     send_raw_message(msg, SEND_MODE_CARRY_ALL_REMAINING_MESSAGE_VALUE);
 
-    save_data(balance, owner_address, jetton_master_address, jetton_wallet_code);
+    save_data();
 }
 
 () on_bounce(slice in_msg_body) impure {
     in_msg_body~skip_bits(32);
 
-    (int balance, slice owner_address, slice jetton_master_address, cell jetton_wallet_code) = load_data();
+    load_data();
 
     int op = in_msg_body~load_uint(32);
     throw_unless(709, (op == op::internal_transfer) | (op == op::burn_notification));
@@ -163,7 +177,7 @@ const int gas_consumption = 15000000; ;; 0.015 TON
     int jetton_amount = in_msg_body~load_coins();
     balance += jetton_amount;
 
-    save_data(balance, owner_address, jetton_master_address, jetton_wallet_code);
+    save_data();
 }
 
 () recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
@@ -205,5 +219,11 @@ const int gas_consumption = 15000000; ;; 0.015 TON
 }
 
 (int, slice, slice, cell) get_wallet_data() method_id {
-    return load_data();
+    load_data();
+    return (balance, owner, jetton_minter, jetton_wallet_code);
+}
+
+(int, int) get_deposit_data() method_id {
+    load_data();
+    return (deposit_ts, apy);
 }

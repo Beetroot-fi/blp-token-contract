@@ -2,3 +2,4 @@ const int error::not_admin = 73;
 const int error::not_child = 74;
 const int error::unknown_op_code = 0xffff;
 const int error::wrong_workchain = 333;
+const int error::unknonw_sender = 222;

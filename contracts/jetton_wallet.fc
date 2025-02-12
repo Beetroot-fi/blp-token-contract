@@ -14,12 +14,15 @@ global cell jetton_wallet_code;
 
 () load_data() impure inline_ref {
     slice ds = get_data().begin_parse();
+
     balance = ds~load_coins();
     owner = ds~load_msg_addr();
     jetton_minter = ds~load_msg_addr();
     deposit_ts = ds~load_uint(32);
     apy = ds~load_uint(4);
     jetton_wallet_code = ds~load_ref();
+
+    ds.end_parse();
 }
 
 () save_data() impure inline_ref {
@@ -86,7 +89,7 @@ global cell jetton_wallet_code;
     
     int forward_ton_amount = in_msg_body~load_coins();
 
-    if (sender_address == jetton_minter) {
+    if (equal_slices_bits(sender_address, jetton_minter)) {
         int new_apy = in_msg_body~load_uint(4);
         apy = new_apy;
 
@@ -146,12 +149,15 @@ global cell jetton_wallet_code;
     throw_unless(706, balance >= 0);
     throw_unless(707, msg_value > fwd_fee + 2 * gas_consumption);
 
+    int profit = (balance * apy * (now() - deposit_ts)) / (100 * 31536000);
+
     cell msg_body = begin_cell()
         .store_uint(op::burn_notification, 32)
         .store_uint(query_id, 64)
         .store_coins(jetton_amount)
         .store_slice(owner)
         .store_slice(response_address)
+        .store_coins(profit)
         .end_cell();
     cell msg = begin_cell()
         .store_uint(0x18, 6)

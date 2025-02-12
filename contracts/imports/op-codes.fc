@@ -8,3 +8,4 @@ const int op::mint = 21;
 const int op::change_admin = 3;
 const int op::change_content = 4;
 const int op::change_tgbtc_jetton_wallet = 5;
+const int op::upgrade_contract = 999;

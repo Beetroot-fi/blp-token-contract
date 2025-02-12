@@ -66,33 +66,28 @@ global cell jetton_wallet_code;
 
     if (op == op::transfer_notification) {
         int jetton_amount = in_msg_body~load_coins();
-        slice sender = in_msg_body~load_msg_addr();
+        slice owner = in_msg_body~load_msg_addr();
 
-        if (equal_slices_bits(sender, tgbtc_jetton_wallet)) {
-            int either_forward_payload = in_msg_body~load_bool();
-            slice forward_payload = either_forward_payload ? in_msg_body~load_ref().begin_parse() : in_msg_body;
-            int apy = forward_payload~load_uint(4);
-            forward_payload.end_parse();
-            apy~dump();
+        throw_unless(error::unknown_sender, equal_slices_bits(sender_address, tgbtc_jetton_wallet));
 
-            cell master_msg = begin_cell()
-                .store_uint(op::internal_transfer, 32)
-                .store_uint(query_id, 64)
-                .store_coins(jetton_amount)
-                .store_slice(sender)
-                .store_slice(sender)
-                .store_coins(1)
-                .store_uint(apy, 4)
-                .end_cell();
+        int either_forward_payload = in_msg_body~load_bool();
+        slice forward_payload = either_forward_payload ? in_msg_body~load_ref().begin_parse() : in_msg_body;
 
-            mint_tokens(sender, jetton_wallet_code, jetton_amount, master_msg);
+        cell master_msg = begin_cell()
+            .store_uint(op::internal_transfer, 32)
+            .store_uint(query_id, 64)
+            .store_coins(jetton_amount)
+            .store_slice(owner)
+            .store_slice(owner)
+            .store_coins(3000000)
+            .store_slice(forward_payload)
+            .end_cell();
 
-            total_supply += jetton_amount;
+        mint_tokens(owner, jetton_wallet_code, 10500000, master_msg); ;; 0.0135 ton
 
-            save_data();
-        } else {
-            throw(error::unknonw_sender);
-        }
+        total_supply += jetton_amount;
+
+        save_data();
 
         return ();
     }
@@ -100,6 +95,7 @@ global cell jetton_wallet_code;
     if (op == op::burn_notification) {
         int jetton_amount = in_msg_body~load_coins();
         slice from_address = in_msg_body~load_msg_addr();
+        int profit = in_msg_body~load_coins();
         
         slice jetton_wallet = calculate_user_jetton_wallet_address(from_address, my_address(), jetton_wallet_code);
 
@@ -108,6 +104,25 @@ global cell jetton_wallet_code;
         total_supply -= jetton_amount;
 
         save_data();
+
+        cell msg_body = begin_cell()
+            .store_uint(op::transfer, 32)
+            .store_uint(query_id, 64)
+            .store_coins(jetton_amount)
+            .store_slice(from_address)
+            .store_slice(from_address)
+            .store_uint(0, 1)
+            .store_coins(1)
+            .store_uint(0, 1)
+            .end_cell();
+        cell msg = begin_cell()
+            .store_uint(0x10, 6)
+            .store_slice(tgbtc_jetton_wallet)
+            .store_coins(50000000)
+            .store_uint(1, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+            .store_ref(msg_body)
+            .end_cell();
+        send_raw_message(msg, SEND_MODE_REGULAR);
 
         slice response_address = in_msg_body~load_msg_addr();
         if (response_address.preload_uint(2) != 0) {
@@ -148,6 +163,15 @@ global cell jetton_wallet_code;
         in_msg_body.end_parse();
         tgbtc_jetton_wallet = new_tgbtc_jetton_wallet;
         save_data();
+        return ();
+    }
+
+    if (op == op::upgrade_contract) {
+        throw_unless(error::not_admin, equal_slices_bits(sender_address, admin));
+        (cell new_data, cell new_code) = (in_msg_body~load_ref(), in_msg_body~load_ref());
+        in_msg_body.end_parse();
+        set_data(new_data);
+        set_code(new_code);
         return ();
     }
 

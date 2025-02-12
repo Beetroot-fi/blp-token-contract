@@ -77,12 +77,28 @@ export class JettonMinter implements Contract {
             value,
             sendMode: SendMode.PAY_GAS_SEPARATELY,
             body: beginCell()
-                .storeUint(4, 32)
+                .storeUint(5, 32)
                 .storeUint(opts.queryId, 64)
                 .storeAddress(opts.newTGBTCJettonWallet)
                 .endCell()
         })
+    }
 
+    async sendUpgradeContract(provider: ContractProvider, via: Sender, value: bigint, opts: {
+        queryId: bigint,
+        newData: Cell,
+        newCode: Cell,
+    }) {
+        await provider.internal(via, {
+            value,
+            sendMode: SendMode.PAY_GAS_SEPARATELY,
+            body: beginCell()
+                .storeUint(999, 32)
+                .storeUint(opts.queryId, 64)
+                .storeRef(opts.newData)
+                .storeRef(opts.newCode)
+                .endCell()
+        })
     }
 
     async getJettonData(provider: ContractProvider) {

@@ -54,7 +54,7 @@ export class JettonWallet implements Contract {
                 .storeUint(opts.queryId, 64)
                 .storeCoins(opts.jettonAmount)
                 .storeAddress(opts.toOwnerAddress)
-                .storeAddress(opts.toOwnerAddress)
+                .storeAddress(via.address)
                 .storeBit(0)
                 .storeCoins(opts.fwdTonAmount)
                 .storeMaybeRef(opts.forwardPayload)

@@ -18,7 +18,6 @@ global cell jetton_wallet_code;
     jetton_wallet_code = ds~load_ref();
 
     ds.end_parse();
-
 }
 
 () save_data() impure inline_ref {
@@ -178,9 +177,9 @@ global cell jetton_wallet_code;
     throw(error::unknown_op_code);
 }
 
-(int, slice, cell, cell) get_jetton_data() method_id {
+(int, int,  slice, cell, cell) get_jetton_data() method_id {
     load_data();
-    return (total_supply, admin, content, jetton_wallet_code);
+    return (total_supply, -1, admin, content, jetton_wallet_code);
 }
 
 slice get_wallet_address(slice owner_address) method_id {

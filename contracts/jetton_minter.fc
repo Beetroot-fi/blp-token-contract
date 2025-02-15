@@ -94,6 +94,7 @@ global cell jetton_wallet_code;
     if (op == op::burn_notification) {
         int jetton_amount = in_msg_body~load_coins();
         slice from_address = in_msg_body~load_msg_addr();
+        slice response_address = in_msg_body~load_msg_addr();
         int profit = in_msg_body~load_coins();
         
         slice jetton_wallet = calculate_user_jetton_wallet_address(from_address, my_address(), jetton_wallet_code);
@@ -123,7 +124,6 @@ global cell jetton_wallet_code;
             .end_cell();
         send_raw_message(msg, SEND_MODE_REGULAR);
 
-        slice response_address = in_msg_body~load_msg_addr();
         if (response_address.preload_uint(2) != 0) {
             cell msg = begin_cell()
                 .store_uint(0x10, 6)

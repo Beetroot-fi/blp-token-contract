@@ -96,6 +96,7 @@ global cell jetton_wallet_code;
         slice from_address = in_msg_body~load_msg_addr();
         slice response_address = in_msg_body~load_msg_addr();
         int profit = in_msg_body~load_coins();
+        in_msg_body.end_parse();
         
         slice jetton_wallet = calculate_user_jetton_wallet_address(from_address, my_address(), jetton_wallet_code);
 

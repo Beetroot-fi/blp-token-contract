@@ -105,6 +105,7 @@ export class JettonMinter implements Contract {
         let result = await provider.get('get_jetton_data', []);
         return {
             totalSupply: result.stack.readBigNumber(),
+            mintable: result.stack.readNumber(),
             admin: result.stack.readAddress(),
             content: result.stack.readCell(),
             jettonWalletCode: result.stack.readCell(),

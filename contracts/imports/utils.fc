@@ -5,19 +5,26 @@
     throw_unless(error::wrong_workchain, wc == BASECHAIN);
 }
 
-cell pack_jetton_wallet_data(int balance, slice owner_address, slice jetton_master_address, cell jetton_wallet_code) inline {
+cell pack_jetton_wallet_data(
+    int balance,
+    slice owner_address,
+    slice jetton_master_address,
+    cell jetton_wallet_code,
+    int deposit_ts,
+    int apy
+) inline {
     return begin_cell()
         .store_coins(balance)
         .store_slice(owner_address)
         .store_slice(jetton_master_address)
-        .store_uint(0, 32)
-        .store_uint(0, 10)
+        .store_uint(deposit_ts, 32)
+        .store_uint(apy, 10)
         .store_ref(jetton_wallet_code)
         .end_cell();
 }
 
 cell calculate_jetton_wallet_state_init(slice owner_address, slice jetton_master_address, cell jetton_wallet_code) inline {
-    cell data = pack_jetton_wallet_data(0, owner_address, jetton_master_address, jetton_wallet_code);
+    cell data = pack_jetton_wallet_data(0, owner_address, jetton_master_address, jetton_wallet_code, 0, 0);
     return begin_cell()
         .store_uint(6, 5)
         .store_ref(jetton_wallet_code)

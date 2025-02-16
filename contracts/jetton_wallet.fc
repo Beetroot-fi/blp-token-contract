@@ -90,9 +90,7 @@ global cell jetton_wallet_code;
     int forward_ton_amount = in_msg_body~load_coins();
 
     if (equal_slices_bits(sender_address, jetton_minter)) {
-        int new_apy = in_msg_body~load_uint(10);
-        apy = new_apy;
-
+        apy = in_msg_body~load_uint(10);
         deposit_ts = now();
     }
 

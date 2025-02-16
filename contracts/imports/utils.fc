@@ -11,7 +11,7 @@ cell pack_jetton_wallet_data(int balance, slice owner_address, slice jetton_mast
         .store_slice(owner_address)
         .store_slice(jetton_master_address)
         .store_uint(0, 32)
-        .store_uint(0, 4)
+        .store_uint(0, 10)
         .store_ref(jetton_wallet_code)
         .end_cell();
 }
